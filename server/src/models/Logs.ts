@@ -1,36 +1,13 @@
-import mongoose, { Schema, Document } from "mongoose";
+import { Schema, model } from "mongoose";
 
-export interface ILog extends Document {
-  issueId?: mongoose.Types.ObjectId;
-  rawText: string;
-  source: "voice" | "terminal" | "text";
-  transcriptConfidence?: number;
-  createdAt: Date;
-}
-
-const LogSchema: Schema = new Schema(
+const logSchema = new Schema(
   {
-    issueId: {
-      type: Schema.Types.ObjectId,
-      ref: "Issue",
-    },
-    rawText: {
-      type: String,
-      required: [true, "Log text or transcript is required"],
-    },
-    source: {
-      type: String,
-      enum: ["voice", "terminal", "text"],
-      default: "text",
-    },
-    transcriptConfidence: {
-      type: Number,
-      default: 1.0,
-    },
+    sessionId: { type: String, default: "", index: true },
+    source: { type: String, enum: ["transcript", "terminal", "mentor"], required: true },
+    content: { type: String, required: true },
+    issue: { type: Schema.Types.ObjectId, ref: "Issue" },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-export const Log = mongoose.model<ILog>("Log", LogSchema);
+export const Log = model("Log", logSchema);

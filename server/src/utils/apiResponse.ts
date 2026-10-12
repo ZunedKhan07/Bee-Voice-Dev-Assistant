@@ -1,13 +1,17 @@
-export class ApiResponse<T = any> {
-  public statusCode: number;
-  public data: T;
-  public message: string;
-  public success: boolean;
+import type { Response } from "express";
 
-  constructor(statusCode: number, data: T, message = "Success") {
+export class ApiError extends Error {
+  statusCode: number;
+  constructor(statusCode: number, message: string) {
+    super(message);
     this.statusCode = statusCode;
-    this.data = data;
-    this.message = message;
-    this.success = statusCode < 400;
   }
 }
+
+export const sendSuccess = <T>(res: Response, data: T, message = "OK", statusCode = 200): void => {
+  res.status(statusCode).json({ success: true, message, data });
+};
+
+// Trim and cap user-supplied text; anything that is not a string becomes "".
+export const cleanText = (value: unknown, max: number): string =>
+  typeof value === "string" ? value.trim().slice(0, max) : "";

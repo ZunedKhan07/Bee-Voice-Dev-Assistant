@@ -1,96 +1,102 @@
-import { Request, Response } from "express";
-import { asyncHandler } from "../utils/asyncHandler.js";
-import { ApiResponse } from "../utils/apiResponse.js";
+import mongoose from "mongoose";
+import { emitEvent } from "../config/socket.js";
 import { Issue } from "../models/Issue.js";
-import { Log } from "../models/Logs.js";
-import { analyzeLogWithBedrock } from "../services/bedrockService.js";
-import { createGitHubIssue } from "../services/githubService.js";
-import { getIO } from "../config/socket.js";
+import { analyzeIssue } from "../services/bedrockService.js";
+import { createGithubIssue } from "../services/githubService.js";
+import { ApiError, cleanText, sendSuccess } from "../utils/apiResponse.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { sanitizeLog } from "../utils/logParser.js";
 
-// 1. Ingest raw log or voice transcript -> Call AI -> Create Issue Card -> Socket Broadcast
-export const ingestLogOrVoice = asyncHandler(async (req: Request, res: Response) => {
-  const { rawText, source = "text" } = req.body;
+const SEVERITIES = ["low", "medium", "high"];
 
-  if (!rawText || rawText.trim() === "") {
-    return res.status(400).json(new ApiResponse(400, null, "Log text or voice transcript is required"));
+// The raw transcript stays on the server.
+const toClient = (doc: { toObject: () => unknown }): Record<string, unknown> => {
+  const obj = doc.toObject() as Record<string, unknown>;
+  delete obj.transcript;
+  delete obj.__v;
+  return obj;
+};
+
+const readList = (value: unknown, maxItems: number, maxLen: number): string[] | undefined =>
+  Array.isArray(value) ? value.map((v) => cleanText(v, maxLen)).filter(Boolean).slice(0, maxItems) : undefined;
+
+interface BodyFields {
+  summary: string;
+  rootCause: string;
+  suggestedFix: string;
+  severity: string;
+  techStack: string[];
+  reproductionSteps: string[];
+}
+
+const section = (heading: string, content: string): string => (content ? `## ${heading}\n${content}\n` : "");
+
+const buildBody = (i: BodyFields): string =>
+  [
+    section("Summary", i.summary),
+    section("Root cause", i.rootCause),
+    i.reproductionSteps.length
+      ? section("Reproduction steps", i.reproductionSteps.map((s, n) => `${n + 1}. ${s}`).join("\n"))
+      : "",
+    section("Suggested fix", i.suggestedFix),
+    `**Severity:** ${i.severity}` + (i.techStack.length ? `  \n**Tech stack:** ${i.techStack.join(", ")}` : ""),
+    "---\n_Created with Bee Voice-Dev Assistant_",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+// POST /api/issues/analyze: transcript or log in, structured draft out.
+export const analyze = asyncHandler(async (req, res) => {
+  const transcript = sanitizeLog(cleanText(req.body?.transcript, 30000), 12000);
+  if (transcript.length < 10) {
+    throw new ApiError(400, "Describe the bug or paste an error log (at least 10 characters).");
   }
-
-  // Step A: Call AWS Bedrock AI Engine
-  const aiResult = await analyzeLogWithBedrock(rawText);
-
-  // Step B: Create New Issue in Database
-  const newIssue = await Issue.create({
-    title: aiResult.issueSummary,
-    description: `Root Concept: ${aiResult.rootCauseConcept}\nSuggested Action:${aiResult.suggestedAction}`,
-    logs: rawText,
-    status: "open",
-    learningHints: [aiResult.learningHint],
-  });
-
-  // Step C: Save Log Linked to this Issue
-  await Log.create({
-    issueId: newIssue._id,
-    rawText,
-    source,
-  });
-
-  // Step D: Realtime Broadcast via Socket.IO to React Dashboard
-  try {
-    const io = getIO();
-    io.emit("issue:created", newIssue);
-  } catch (err) {
-    console.log("Socket notification skipped (Socket server not attached yet)");
-  }
-
-  return res.status(201).json(new ApiResponse(201, newIssue, "Issue ingested and created successfully"));
+  const draft = await analyzeIssue(transcript);
+  const issue = await Issue.create({ ...draft, transcript, status: "draft" });
+  sendSuccess(res, toClient(issue), "Issue draft generated", 201);
 });
 
-// 2. Get All Pending / Open Issues for Dashboard
-export const getPendingIssues = asyncHandler(async (req: Request, res: Response) => {
-  const issues = await Issue.find().sort({ createdAt: -1 });
-  return res.status(200).json(new ApiResponse(200, issues, "Issues fetched successfully"));
-});
+// POST /api/issues/push-github: apply the user's edits, publish, mark as pushed.
+export const pushGithub = asyncHandler(async (req, res) => {
+  const id = cleanText(req.body?.id, 40);
+  if (!mongoose.isValidObjectId(id)) throw new ApiError(400, "A valid issue id is required");
 
-// 3. Update / Edit Issue Details (Admin Review)
-export const updateIssue = asyncHandler(async (req: Request, res: Response) => {
-  const { issueId } = req.params;
-  const { title, description, status, learningHints } = req.body;
+  const issue = await Issue.findById(id);
+  if (!issue) throw new ApiError(404, "Draft not found. Please generate the issue again.");
+  if (issue.status === "pushed") throw new ApiError(409, "This issue is already on GitHub");
 
-  const updatedIssue = await Issue.findByIdAndUpdate(
-    issueId,
-    { title, description, status, learningHints },
-    { new: true, runValidators: true }
-  );
+  const edits: Record<string, unknown> = {};
+  const title = cleanText(req.body?.title, 200);
+  if (title) edits.title = title;
+  const summary = cleanText(req.body?.summary, 4000);
+  if (summary) edits.summary = summary;
+  if (typeof req.body?.rootCause === "string") edits.rootCause = cleanText(req.body.rootCause, 2000);
+  if (typeof req.body?.suggestedFix === "string") edits.suggestedFix = cleanText(req.body.suggestedFix, 3000);
+  if (SEVERITIES.includes(req.body?.severity)) edits.severity = req.body.severity;
+  const techStack = readList(req.body?.techStack, 8, 30);
+  if (techStack) edits.techStack = techStack;
+  const steps = readList(req.body?.reproductionSteps, 15, 500);
+  if (steps) edits.reproductionSteps = steps;
+  issue.set(edits);
 
-  if (!updatedIssue) {
-    return res.status(404).json(new ApiResponse(404, null, "Issue not found"));
-  }
-
-  return res.status(200).json(new ApiResponse(200, updatedIssue, "Issue updated successfully"));
-});
-
-// 4. Single-Click Push Issue to Official GitHub Repository
-export const pushToGitHub = asyncHandler(async (req: Request, res: Response) => {
-  const { issueId } = req.params;
-
-  const issue = await Issue.findById(issueId);
-  if (!issue) {
-    return res.status(404).json(new ApiResponse(404, null, "Issue not found"));
-  }
-
-  // Format issue body with AI learning hints
-  const githubBody = `### Description\n${issue.description}\n\n### Learning Hints\n${issue.learningHints.map((h, i) => `${i + 1}. ${h}`).join("\n")}\n\n### Raw Logs\n\`\`\`\n${issue.logs}\n\`\`\``;
-
-  // Call GitHub Service
-  const githubResult = await createGitHubIssue({
-    title: issue.title,
-    body: githubBody,
-  });
-
-  // Update DB Issue with GitHub URL and Status
-  issue.githubIssueUrl = githubResult.issueUrl;
-  issue.status = "in-progress";
+  const created = await createGithubIssue(issue.title, buildBody(issue), [
+    "bee-voice-dev",
+    `severity:${issue.severity}`,
+  ]);
+  issue.set({ status: "pushed", githubIssueUrl: created.url, githubIssueNumber: created.number });
   await issue.save();
 
-  return res.status(200).json(new ApiResponse(200, issue, "Issue published to GitHub successfully"));
+  const payload = toClient(issue);
+  emitEvent("issue:pushed", payload);
+  sendSuccess(res, payload, "Issue created on GitHub");
+});
+
+// GET /api/issues/open: everything already published.
+export const getOpenIssues = asyncHandler(async (_req, res) => {
+  const issues = await Issue.find({ status: "pushed" })
+    .select("-transcript -__v")
+    .sort({ createdAt: -1 })
+    .limit(100)
+    .lean();
+  sendSuccess(res, issues);
 });

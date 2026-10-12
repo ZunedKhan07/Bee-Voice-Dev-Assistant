@@ -1,49 +1,22 @@
-import mongoose, { Schema, Document } from "mongoose";
+import { Schema, model } from "mongoose";
 
-export interface IIssue extends Document {
-  title: string;
-  description: string;
-  logs?: string;
-  status: "open" | "in-progress" | "resolved";
-  learningHints: string[];
-  githubIssueUrl?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-const IssueSchema: Schema = new Schema(
+const issueSchema = new Schema(
   {
-    title: {
-      type: String,
-      required: [true, "Issue title is required"],
-      trim: true,
-    },
-    description: {
-      type: String,
-      required: [true, "Issue description is required"],
-    },
-    logs: {
-      type: String,
-      default: "",
-    },
-    status: {
-      type: String,
-      enum: ["open", "in-progress", "resolved"],
-      default: "open",
-    },
-    learningHints: [
-      {
-        type: String,
-      },
-    ],
-    githubIssueUrl: {
-      type: String,
-      default: "",
-    },
+    title: { type: String, required: true, trim: true, maxlength: 200 },
+    summary: { type: String, required: true },
+    rootCause: { type: String, default: "" },
+    techStack: { type: [String], default: [] },
+    severity: { type: String, enum: ["low", "medium", "high"], default: "medium" },
+    suggestedFix: { type: String, default: "" },
+    reproductionSteps: { type: [String], default: [] },
+    transcript: { type: String, default: "" },
+    status: { type: String, enum: ["draft", "pushed"], default: "draft" },
+    githubIssueUrl: { type: String, default: "" },
+    githubIssueNumber: { type: Number },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-export const Issue = mongoose.model<IIssue>("Issue", IssueSchema);
+issueSchema.index({ status: 1, createdAt: -1 });
+
+export const Issue = model("Issue", issueSchema);

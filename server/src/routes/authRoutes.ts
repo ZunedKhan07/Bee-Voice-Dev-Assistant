@@ -1,9 +1,7 @@
 import { Router } from "express";
-import { verifyAdmin } from "../controllers/authController.js";
+import { login } from "../controllers/authController.js";
 
 const router = Router();
-
-// Endpoint: Verify Admin Password
-router.post("/verify", verifyAdmin);
+router.post("/login", login);
 
 export default router;

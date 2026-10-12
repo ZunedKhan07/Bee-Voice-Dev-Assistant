@@ -1,146 +1,129 @@
-import React, { useEffect, useState } from "react";
-import { getPendingIssues, ingestLog } from "../services/api";
-import type { Issue } from "../services/api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
+import SeverityBadge from "../component/SeverityBadge";
 import { useSocket } from "../context/SocketContext";
+import { useToast } from "../context/ToastContext";
+import { api, errMsg } from "../services/api";
+import type { Issue, Severity } from "../types";
 
-export const Contribute: React.FC = () => {
+type Filter = "all" | Severity;
+const filters: { value: Filter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "high", label: "High" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" },
+];
+
+export default function Contribute() {
+  const socket = useSocket();
+  const toast = useToast();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
-  const [logInput, setLogInput] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const { socket } = useSocket();
+  const [error, setError] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
 
-  const fetchIssues = async () => {
+  const load = useCallback(async () => {
     try {
-      const res = await getPendingIssues();
-      setIssues(res.data || []);
-    } catch (err) {
-      console.error("Failed to load issues", err);
+      setIssues(await api.openIssues());
+      setError("");
+    } catch (e) {
+      setError(errMsg(e));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchIssues();
+    void load();
+  }, [load]);
 
-    if (socket) {
-      socket.on("issue:created", (newIssue: Issue) => {
-        setIssues((prev) => [newIssue, ...prev]);
-      });
-    }
-
-    return () => {
-      socket?.off("issue:created");
+  // Live updates: a newly published issue appears without a refresh.
+  useEffect(() => {
+    if (!socket) return;
+    const onPushed = (issue: Issue) => {
+      setIssues((prev) => (prev.some((i) => i._id === issue._id) ? prev : [issue, ...prev]));
+      toast.info(`New issue published: ${issue.title}`);
     };
-  }, [socket]);
+    socket.on("issue:pushed", onPushed);
+    return () => {
+      socket.off("issue:pushed", onPushed);
+    };
+  }, [socket, toast]);
 
-  const handleIngest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!logInput.trim()) return;
-
-    setSubmitting(true);
-    try {
-      await ingestLog(logInput, "text");
-      setLogInput("");
-      await fetchIssues();
-    } catch (err) {
-      alert("Error submitting log. Please check server.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const visible = useMemo(() => (filter === "all" ? issues : issues.filter((i) => i.severity === filter)), [issues, filter]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-12">
-      <div className="max-w-6xl mx-auto space-y-10">
-        {/* Header */}
+    <div className="space-y-8">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl md:text-4xl font-bold text-white">Community Issues & Contribute</h1>
-          <p className="text-slate-400 mt-2">Submit your error logs or explore open issues created by students.</p>
+          <h1 className="text-3xl font-bold text-slate-50">Open issues</h1>
+          <p className="mt-2 text-slate-400">Real GitHub issues created with Bee. Pick one and start contributing.</p>
         </div>
-
-        {/* Ingest Form Card */}
-        <div className="p-6 rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur-md space-y-4">
-          <h2 className="text-xl font-semibold text-cyan-400 flex items-center gap-2">
-            <span>⚡</span> Submit Log for Analysis
-          </h2>
-          <form onSubmit={handleIngest} className="space-y-4">
-            <textarea
-              value={logInput}
-              onChange={(e) => setLogInput(e.target.value)}
-              placeholder="Paste terminal error logs or stack trace here..."
-              rows={4}
-              className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition font-mono text-sm"
-            />
+        <div className="flex gap-2" role="group" aria-label="Filter by severity">
+          {filters.map((f) => (
             <button
-              type="submit"
-              disabled={submitting}
-              className="px-6 py-3 rounded-xl font-semibold bg-cyan-500 text-slate-950 hover:bg-cyan-400 transition shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+              key={f.value}
+              type="button"
+              onClick={() => setFilter(f.value)}
+              aria-pressed={filter === f.value}
+              className={`rounded-full border px-3 py-1 text-sm font-medium ${
+                filter === f.value ? "border-cyan-400 bg-cyan-500/10 text-cyan-300" : "border-slate-700 text-slate-400 hover:text-slate-100"
+              }`}
             >
-              {submitting ? "Analyzing with AI..." : "Ingest & Create Card"}
+              {f.label}
             </button>
-          </form>
+          ))}
         </div>
+      </header>
 
-        {/* Issues List */}
-        <div className="space-y-4">
-          <h2 className="text-2xl font-bold text-white">Open Debugging Cards</h2>
+      {error && <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{error}</p>}
 
-          {loading ? (
-            <p className="text-slate-500">Loading issues...</p>
-          ) : issues.length === 0 ? (
-            <div className="p-8 rounded-2xl border border-slate-800 bg-slate-900/30 text-center text-slate-400">
-              No open issues found. Submit one above!
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {issues.map((issue) => (
-                <div
-                  key={issue._id}
-                  className="p-6 rounded-2xl border border-slate-800 bg-slate-900/40 hover:border-slate-700 transition space-y-4 flex flex-col justify-between"
-                >
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-start gap-4">
-                      <h3 className="font-semibold text-lg text-white leading-snug">{issue.title}</h3>
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold capitalize border ${
-                          issue.status === "open"
-                            ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
-                            : "border-cyan-500/30 bg-cyan-500/10 text-cyan-400"
-                        }`}
-                      >
-                        {issue.status}
-                      </span>
-                    </div>
+      {loading && (
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true">
+          {[0, 1, 2].map((n) => (
+            <div key={n} className="h-56 animate-pulse rounded-xl border border-slate-800 bg-slate-900/60" />
+          ))}
+        </div>
+      )}
 
-                    <p className="text-slate-400 text-sm whitespace-pre-line">{issue.description}</p>
-
-                    {/* Hints Section */}
-                    {issue.learningHints && issue.learningHints.length > 0 && (
-                      <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80 space-y-1">
-                        <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Learning Hint:</span>
-                        <p className="text-xs text-slate-300">{issue.learningHints[0]}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {issue.githubIssueUrl && (
-                    <a
-                      href={issue.githubIssueUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-2 text-xs font-semibold text-cyan-400 hover:underline pt-2"
-                    >
-                      <span>🐙</span> View on GitHub →
-                    </a>
-                  )}
-                </div>
-              ))}
-            </div>
+      {!loading && !error && visible.length === 0 && (
+        <div className="rounded-xl border border-dashed border-slate-700 p-10 text-center">
+          <p className="text-slate-300">{issues.length === 0 ? "No issues published yet." : "No issues match this filter."}</p>
+          {issues.length === 0 && (
+            <Link to="/voice-ingest" className="mt-3 inline-block text-cyan-400 underline">Create the first one with your voice</Link>
           )}
         </div>
+      )}
+
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        {visible.map((i) => (
+          <article key={i._id} className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/90 p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <SeverityBadge severity={i.severity} />
+              {i.techStack.map((t) => (
+                <span key={t} className="rounded bg-cyan-500/10 px-2 py-0.5 font-mono text-xs text-cyan-300">{t}</span>
+              ))}
+            </div>
+            <h2 className="mt-3 text-lg font-semibold leading-snug text-slate-50">{i.title}</h2>
+            <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-slate-400">{i.summary}</p>
+            {i.rootCause && (
+              <p className="mt-3 line-clamp-3 border-l-2 border-amber-400/60 pl-3 text-sm leading-relaxed text-slate-300">
+                <span className="font-semibold text-amber-300">Root cause: </span>
+                {i.rootCause}
+              </p>
+            )}
+            <a
+              href={i.githubIssueUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-auto inline-flex items-center gap-2 self-start pt-4 text-sm font-semibold text-cyan-400 hover:text-cyan-300"
+            >
+              View issue #{i.githubIssueNumber} on GitHub <ExternalLink className="h-4 w-4" aria-hidden />
+            </a>
+          </article>
+        ))}
       </div>
     </div>
   );
-};
+}

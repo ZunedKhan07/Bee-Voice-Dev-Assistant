@@ -1,52 +1,55 @@
+import "dotenv/config";
+import cors from "cors";
 import express from "express";
 import http from "http";
-import cors from "cors";
-import dotenv from "dotenv";
-import connect_DB from "./config/db.js";
+import { connect_DB, disconnectDB } from "./config/db.js";
 import { initSocket } from "./config/socket.js";
-
-// Route Imports
+import { errorHandler, notFound } from "./middleware/errorHandler.js";
 import issueRoutes from "./routes/issueRoutes.js";
-import authRoutes from "./routes/authRoutes.js";
 import mentorRoutes from "./routes/mentorRoutes.js";
 
-// Load Environment Variables
-dotenv.config();
+const PORT = Number(process.env.PORT) || 5000;
+const CLIENT_URLS = (process.env.CLIENT_URL || "http://localhost:5173")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
-const app = express();
-const PORT = process.env.PORT || 5000;
-
-// Middlewares
-app.use(cors());
-app.use(express.json());
-
-// Create HTTP Server for Express + Socket.IO
-const server = http.createServer(app);
-
-// Initialize Socket.IO Engine
-initSocket(server);
-
-// API Route Bindings
-app.use("/api/issues", issueRoutes);
-app.use("/api/auth", authRoutes);
-app.use("/api/mentor", mentorRoutes);
-
-// Health Check Endpoint
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "OK", message: "Bee Voice-Dev Assistant API is running smoothly!" });
-});
-
-// Start DB and Server
-const startServer = async () => {
-  try {
-    await connect_DB();
-    server.listen(PORT, () => {
-      console.log(`🚀 Server listening on port ${PORT}`);
-    });
-  } catch (error) {
-    console.error("Failed to start server due to DB connection issue:", error);
-    process.exit(1);
-  }
+const warnAboutEnv = (): void => {
+  const missing = ["GITHUB_TOKEN", "GITHUB_OWNER", "GITHUB_REPO"].filter((k) => !process.env[k]);
+  if (missing.length) console.warn(`[env] GitHub publishing will fail until these are set: ${missing.join(", ")}`);
 };
 
-startServer();
+const app = express();
+app.disable("x-powered-by");
+app.use(cors({ origin: CLIENT_URLS }));
+app.use(express.json({ limit: "1mb" }));
+
+app.get("/api/health", (_req, res) => {
+  res.json({ success: true, message: "Bee backend is running" });
+});
+app.use("/api/issues", issueRoutes);
+app.use("/api/mentor", mentorRoutes);
+app.use(notFound);
+app.use(errorHandler);
+
+const start = async (): Promise<void> => {
+  warnAboutEnv();
+  await connect_DB();
+  const server = http.createServer(app);
+  initSocket(server, CLIENT_URLS);
+  server.listen(PORT, () => console.log(` 🚀 [server] http://localhost:${PORT}`));
+
+  const shutdown = (): void => {
+    console.log("[server] shutting down");
+    server.close(() => {
+      void disconnectDB().finally(() => process.exit(0));
+    });
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+};
+
+start().catch((err) => {
+  console.error("[server] failed to start:", err);
+  process.exit(1);
+});
