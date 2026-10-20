@@ -1,108 +1,145 @@
 # 🐝 Bee Voice-Dev Assistant
 
-> **Voice-First AI Developer Ecosystem & Automated GitHub Issue Pipeline**  
-> Built for the Amazon Developer Hackathon — Bee Track & AWS Builder Mini Challenge.
+**Voice-First AI Developer Assistant | Bee Agent Framework | Amazon Bedrock | GitHub Issue Automation**
 
-Bee Voice-Dev Assistant helps developers report bugs in open-source projects using voice, convert unstructured observations into actionable GitHub issues, and learn through AI-guided debugging.
+Bee Voice-Dev Assistant is a voice-first AI-powered developer tool that helps developers report bugs in open-source projects, convert unstructured voice descriptions into structured GitHub issues, and learn debugging through Socratic AI guidance.
 
-## 🎯 Philosophy & The Core Problem
+Built for the **Amazon Developer Hackathon — Bee Track & AWS Builder Mini Challenge**, the project aims to reduce the friction of bug reporting while keeping developers in control of reviewing and publishing issues.
 
-When open-source developers, students, and early-career software engineers explore repositories or work on codebases, they frequently encounter bugs, visual glitches, and unexpected runtime errors.
+---
 
-Reporting these issues manually can interrupt their workflow:
+## 🎯 The Problem
 
-1. Stop development or debugging.
+Open-source developers, students, and software engineers frequently encounter bugs, UI glitches, and unexpected runtime errors while working with codebases.
+
+However, reporting these issues often requires several manual steps:
+
+1. Stop the current development workflow.
 2. Open GitHub and navigate to the target repository.
 3. Write a clear issue title and description.
-4. Collect logs and document reproduction steps.
+4. Collect error logs and document reproduction steps.
 5. Submit the issue and return to development.
 
-This friction can lead to unreported bugs and incomplete issue reports.
+This friction can lead to poorly documented issues or bugs that never get reported.
 
-### 💡 Why Voice-to-Issue Instead of Automated Pull Requests?
-
-Many AI coding tools attempt to generate code changes or pull requests automatically. Bee Voice-Dev Assistant focuses on simplifying the reporting process while keeping developers responsible for investigating and solving the underlying problems.
-
-**Our philosophy:** AI should reduce repetitive work without replacing the learning experience of software development.
-
-The assistant automates voice-based bug reporting, structures issue descriptions, and provides debugging guidance. Developers remain in control of the final issue submission and subsequent implementation.
+**Bee Voice-Dev Assistant simplifies this process through voice input, AI-assisted issue generation, and a human-approved GitHub publishing workflow.**
 
 ## ✨ Key Features
 
-- **🎙️ Voice-Activated Issue Reporting:** Capture bug descriptions, terminal errors, and unexpected behavior through microphone input using the browser's Web Speech API.
-- **🧠 AI-Powered Issue Analysis:** Uses AWS Bedrock with a supported Claude model to transform transcripts and stack traces into structured issue drafts, including titles, severity, reproduction steps, suspected causes, and suggested fixes.
-- **✏️ Interactive Issue Editor:** Review and edit AI-generated issue details before publishing them to GitHub.
-- **🐙 GitHub REST API Integration:** Publish approved issue drafts to supported GitHub repositories directly from the dashboard.
-- **💬 Socratic AI Developer Mentor:** Get conceptual explanations, debugging hints, and relevant documentation links rather than relying exclusively on copy-paste solutions.
-- **⚡ Real-Time Updates:** Uses Socket.IO to communicate live application events between the frontend and backend.
-- **🔐 Environment-Based Configuration:** Keeps API credentials and sensitive configuration on the backend.
+### 🎙️ Voice-Activated Bug Reporting
+- Describe bugs and unexpected behavior using your microphone.
+- Convert speech into text using the browser's Web Speech API.
+- Capture relevant error messages and debugging context.
 
-## 🏗️ Architecture & Tech Stack
+### 🐝 AI-Powered Issue Generation
+- Transform unstructured bug descriptions into structured issue drafts.
+- Generate clear issue titles and detailed descriptions.
+- Organize reproduction steps, severity, suspected causes, and possible debugging approaches.
+- Use the Bee Agent Framework to orchestrate the workflow when configured.
 
-### System Architecture
+### ✏️ Interactive Issue Editor
+- Review AI-generated issue drafts before publishing.
+- Edit titles, descriptions, and reproduction steps.
+- Keep the developer in control of the final submission.
+
+### 🐙 GitHub Issue Automation
+- Integrate with the GitHub REST API.
+- Publish approved issue drafts to a configured repository.
+- Keep GitHub credentials on the backend rather than exposing them in the frontend.
+
+### 💬 Socratic AI Developer Mentor
+- Receive conceptual explanations and debugging hints.
+- Understand potential causes instead of relying only on copy-paste solutions.
+- Get relevant documentation links and suggestions for investigating problems independently.
+
+### ⚡ Real-Time Agent Updates
+- Use Socket.IO for real-time communication between the frontend and backend.
+- Display agent execution events and workflow progress.
+
+### 🔐 Secure Configuration
+- Store API credentials and environment-specific settings in backend environment variables.
+- Keep AWS and GitHub secrets out of client-side code.
+- Review permissions and configuration before enabling issue publishing.
+
+---
+
+## 🐝 Bee Agent Framework Integration
+
+The project is designed around the **Bee Agent Framework** (`@i-am-bee/bee-agent-framework`) for agent orchestration.
+
+The intended agent workflow includes:
+
+- **Context Processing:** Interpret voice transcripts, error messages, and developer-provided context.
+- **Tool Calling:** Connect agent reasoning to issue structuring and GitHub API operations.
+- **Workflow Orchestration:** Coordinate issue generation, validation, review, and publishing.
+- **Developer Guidance:** Provide debugging explanations and follow-up questions when more context is needed.
+
+The framework's actual tools, skills, memory, and execution flow depend on the implementation in the backend.
+
+## 🏗️ System Architecture
 
 ```text
-┌──────────────────────────────┐
-│       Developer              │
-│  Voice Input / Bug Details   │
-└──────────────┬───────────────┘
-               │
-               ▼
-┌──────────────────────────────┐
-│      React Frontend          │
-│  Speech Recognition + Editor │
-└──────────────┬───────────────┘
-               │ HTTP / Socket.IO
-               ▼
-┌──────────────────────────────┐
-│    Node.js + Express API     │
-│  Validation + Issue Workflow │
-└───────┬──────────┬───────────┘
-        │          │
-        ▼          ▼
-┌─────────────┐  ┌─────────────────┐
-│ AWS Bedrock │  │ MongoDB         │
-│ Claude AI   │  │ Mongoose        │
-└─────────────┘  └─────────────────┘
-        │
-        ▼
-┌──────────────────────────────┐
-│       GitHub REST API         │
-│   Create Approved Issues     │
-└──────────────────────────────┘
+┌───────────────────────────────────────┐
+│           Developer Voice Input       │
+│       Browser Speech Recognition      │
+└───────────────────┬───────────────────┘
+                    │
+                    ▼
+┌───────────────────────────────────────┐
+│             React Frontend            │
+│       Voice UI and Issue Editor       │
+└───────────────────┬───────────────────┘
+                    │ HTTP / Socket.IO
+                    ▼
+┌───────────────────────────────────────┐
+│        Node.js / Express Backend      │
+│                                       │
+│       Bee Agent Framework Layer       │
+│       Agent Tools and Workflows       │
+└──────────┬────────────┬───────────────┘
+           │            │
+           ▼            ▼
+┌─────────────────┐  ┌──────────────────┐
+│ Amazon Bedrock  │  │  GitHub REST API │
+│  AI Model       │  │  Issue Creation  │
+└─────────────────┘  └──────────────────┘
+           │
+           ▼
+┌───────────────────────────────────────┐
+│        MongoDB / Mongoose             │
+│   Application Data (if configured)    │
+└───────────────────────────────────────┘
 ```
 
-### Frontend — `/client`
+## 🛠️ Tech Stack
 
-- **Framework:** React 18 with TypeScript
-- **Build Tool:** Vite
-- **Styling:** Tailwind CSS
-- **Icons:** Lucide Icons, if configured
-- **Real-Time Communication:** Socket.IO Client
-- **Speech Recognition:** Browser Web Speech API (`SpeechRecognition` / `webkitSpeechRecognition`)
+| Component | Technology |
+|---|---|
+| Agent Framework | Bee Agent Framework |
+| Frontend | React, TypeScript, Vite |
+| Styling | Tailwind CSS |
+| Voice Input | Browser Web Speech API |
+| Backend | Node.js, Express.js, TypeScript |
+| Real-Time Communication | Socket.IO |
+| AI Integration | Amazon Bedrock Runtime SDK |
+| AI Model | Supported Amazon Bedrock model |
+| Database | MongoDB, Mongoose |
+| Issue Management | GitHub REST API |
 
-### Backend — `/server`
+*The table describes the intended stack. Verify each integration against the current source code before presenting it as implemented.*
 
-- **Runtime:** Node.js
-- **Framework:** Express.js with TypeScript
-- **AI Integration:** AWS Bedrock Runtime SDK (`@aws-sdk/client-bedrock-runtime`)
-- **Database:** MongoDB with Mongoose
-- **Real-Time Communication:** Socket.IO Server
-- **Additional Utilities:** CORS, dotenv, and Playwright where required by the implemented features
+## ⚙️ Prerequisites
 
-## 📋 Prerequisites
+Before running the project, ensure you have:
 
-Before running the application, make sure you have:
-
-- Node.js 18 or a compatible version supported by your dependencies.
+- Node.js 18 or a compatible version required by the installed dependencies.
 - npm.
-- A MongoDB instance, either local or hosted on MongoDB Atlas.
-- An AWS account with credentials and permission to invoke an available Amazon Bedrock model.
-- A GitHub Personal Access Token with the required permissions to create issues in the target repository.
+- A MongoDB instance, if database features are enabled.
+- AWS credentials and access to an enabled Amazon Bedrock model, if using Bedrock.
+- A GitHub token with the minimum required permissions to create issues in the target repository.
+- Bee Agent Framework configured in the backend.
 
-**Important:** Amazon Bedrock model availability and access requirements vary by AWS Region and model. Verify that your selected Claude model is available to your account before configuring the application.
-
-## 🚀 Getting Started Locally
+## 🚀 Getting Started
 
 ### 1. Clone the Repository
 
@@ -111,11 +148,9 @@ git clone <YOUR_GITHUB_REPOSITORY_URL>
 cd bee-voice-dev-assistant
 ```
 
-Replace the placeholder URL and directory name with your actual repository details.
+Replace `<YOUR_GITHUB_REPOSITORY_URL>` with your actual repository URL.
 
-### 2. Backend Setup
-
-Open a terminal and navigate to the backend:
+### 2. Set Up the Backend
 
 ```bash
 cd server
@@ -124,50 +159,30 @@ npm install
 
 Create a `.env` file inside the `server/` directory:
 
-```env
+```ini
 PORT=5000
 MONGO_URI=mongodb://127.0.0.1:27017/bee-voice-dev
 AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=your_aws_access_key
 AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-GITHUB_TOKEN=your_github_personal_access_token
+GITHUB_TOKEN=your_github_token
 GITHUB_REPO_OWNER=your_github_username
 GITHUB_REPO_NAME=your_target_repository
 ```
 
-Update the values according to your environment.
+Use only the environment variables required by your implementation. Never commit `.env` files or real credentials to GitHub.
 
-**AWS credentials:** For local development, you can use environment variables or a configured AWS credentials profile. For deployed applications, prefer IAM roles or another supported temporary-credential mechanism instead of long-lived access keys.
+For AWS, prefer an appropriate IAM role or temporary credentials over long-lived access keys whenever possible.
 
-**GitHub configuration:** Set the owner and repository name to the repository where you are authorized to create issues. If your implementation supports selecting repositories dynamically, follow its actual configuration instead.
-
-### 3. Configure the Backend Start Script
-
-Check `server/package.json` to confirm that it contains a development script compatible with your project.
-
-For example, if the project uses `tsx`:
-
-```json
-{
-  "scripts": {
-    "dev": "tsx watch src/index.ts"
-  }
-}
-```
-
-This is only an example. If your entry point is `index.ts`, `dist/index.js`, or another file, use the command appropriate for your actual project structure. Install the required development dependency if it is not already present.
-
-Start the backend:
+Start the backend using the script defined in `server/package.json`. If the project provides a `dev` script:
 
 ```bash
 npm run dev
 ```
 
-Keep this terminal running.
+### 3. Set Up the Frontend
 
-### 4. Frontend Setup
-
-Open a second terminal from the project root:
+Open another terminal:
 
 ```bash
 cd client
@@ -175,101 +190,70 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite. The default is usually:
+Open the local URL printed by Vite, commonly:
 
-```text
-http://localhost:5173
-```
+`http://localhost:5173`
 
-If your frontend uses an API base URL environment variable, configure it using the variable name expected by your existing code. Vite-exposed variables typically use the `VITE_` prefix.
+### 4. Configure the Integrations
 
-### 5. Verify the Application
+Before testing the complete workflow:
 
-Before using the application, confirm that:
+1. Confirm that the Bee Agent Framework is installed and imported by the backend.
+2. Configure the required AWS Bedrock model access.
+3. Verify MongoDB connectivity if database features are enabled.
+4. Configure GitHub authentication and repository permissions.
+5. Test voice transcription, issue generation, editing, and publishing separately.
 
-- The backend starts without errors.
-- MongoDB connects successfully.
-- AWS Bedrock can invoke the configured model.
-- GitHub authentication and issue-creation permissions are valid.
-- Browser speech recognition is supported and microphone permission is granted.
-- The frontend can communicate with the backend.
-- AI-generated issues can be reviewed before publishing.
+*The commands and environment variables may need adjustment to match the actual repository structure and package scripts.*
 
 ## 🔄 How It Works
 
-1. **Capture:** The developer describes a bug or provides relevant error details.
-2. **Transcribe:** Browser speech recognition converts spoken input into text when supported.
-3. **Analyze:** The backend sends relevant information to the configured AWS Bedrock model.
-4. **Structure:** The AI produces an issue draft with a title, description, reproduction steps, severity, and debugging suggestions.
+1. **Capture:** The developer describes a bug or unexpected behavior using voice input.
+2. **Transcribe:** Browser speech recognition converts the voice input into text.
+3. **Analyze:** The backend processes the transcript and any supplied error logs.
+4. **Generate:** The AI workflow creates a structured GitHub issue draft.
 5. **Review:** The developer checks and edits the generated content.
-6. **Publish:** After approval, the backend submits the issue through the GitHub REST API.
-7. **Learn:** The Socratic AI mentor offers explanations and debugging guidance to support independent problem-solving.
+6. **Publish:** After explicit approval, the backend submits the issue to GitHub.
+7. **Learn:** The developer can ask follow-up questions and receive debugging guidance.
 
-## 🏆 Hackathon Track Alignment
+## 🔒 Security and Human Oversight
 
-### 🐝 Primary Track: Bee
+- GitHub issue creation requires developer approval.
+- API credentials must remain on the backend.
+- Repository access should be restricted to the minimum necessary permissions.
+- Generated issue content should be reviewed for accuracy, sensitive data, and accidental disclosure of secrets.
+- AI-generated root causes and suggested fixes are hypotheses, not guaranteed diagnoses.
 
-Explores a voice-first developer workflow that reduces friction when reporting bugs and documenting software issues.
+## 🏆 Hackathon Alignment
+
+### 🐝 Bee Track
+Uses the Bee Agent Framework as the intended orchestration layer for a developer-focused agent workflow. The final implementation should demonstrate actual framework usage, tool integration, and agent execution.
 
 ### ☁️ AWS Builder Mini Challenge
+Uses Amazon Bedrock as the intended AI inference service for issue analysis and developer guidance, subject to the configured model and working integration.
 
-Uses Amazon Bedrock to support issue analysis, structured report generation, and AI-assisted developer guidance.
+### 🌍 Open Source Impact
+Makes bug reporting more accessible by helping developers produce clearer, more actionable issues without interrupting their workflow for lengthy manual documentation.
 
-### 🌍 Open Source
+## 🔮 Future Improvements
 
-Aims to make open-source bug reporting more accessible and help developers contribute better-quality issue reports.
-
-*Track names and eligibility should match the official hackathon rules for the specific submission.*
-
-## 🔒 Security & Privacy
-
-- Never commit `.env` files or expose AWS and GitHub credentials in frontend code.
-- Add `.env` and other local secret files to `.gitignore`.
-- Validate and sanitize input before processing it or sending it to external services.
-- Avoid submitting sensitive source code, private logs, or personal data to AI services without authorization.
-- Require user confirmation before creating GitHub issues.
-- Use the minimum permissions necessary for AWS and GitHub integrations.
-
-## 🛣️ Future Improvements
-
-Potential enhancements include:
-
-- Repository-aware issue templates.
-- Automatic collection of browser console errors and stack traces, with user permission.
-- Duplicate issue detection.
-- Support for additional speech recognition providers.
-- Improved issue templates for different project types.
-- Issue history and contribution analytics.
-- Automated tests for API routes and GitHub integration.
-
-These are potential enhancements and should not be considered implemented features unless they are already available in the project.
-
-## 🧪 Testing
-
-Run the test commands configured in each package's `package.json`.
-
-For example, if a test script exists:
-
-```bash
-npm test
-```
-
-Run the command from the relevant project directory. Verify the actual test scripts before using this command.
-
-## 📜 License
-
-This project is intended to be distributed under the MIT License.
-
-Include an MIT `LICENSE` file in the repository before claiming that the project is licensed under MIT.
+- Support pasted terminal logs and screenshots.
+- Detect duplicate issues before publishing.
+- Suggest relevant repository files and documentation.
+- Add multilingual voice input.
+- Support multiple repositories with explicit authorization.
+- Introduce configurable issue templates and labels.
+- Improve error handling, automated tests, and deployment support.
 
 ## 👨‍💻 Author
 
 **Juned Khan**
 
-Full Stack Software Developer
+Full Stack Software Developer | AI Systems
 
-- GitHub: [ZunedKhan07](https://github.com/ZunedKhan07)
+- GitHub: [@ZunedKhan07](https://github.com/ZunedKhan07)
+- Portfolio: [portf-o-jk.vercel.app](https://portf-o-jk.vercel.app)
 
 ---
 
-*Built to reduce bug-reporting friction, support open-source contributors, and encourage independent software engineering skills.*
+**Bee Voice-Dev Assistant — Speak the bug. Structure the issue. Learn to debug.**
